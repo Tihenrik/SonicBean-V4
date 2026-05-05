@@ -1,0 +1,420 @@
+```html
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SonicBeam | Data-Over-Sound</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <style>
+        @keyframes pulse-ring {
+            0% { transform: scale(0.8); opacity: 0.5; }
+            100% { transform: scale(1.5); opacity: 0; }
+        }
+        .radar-pulse::before {
+            content: '';
+            position: absolute;
+            left: -20%; top: -20%; right: -20%; bottom: -20%;
+            border-radius: 50%;
+            border: 2px solid #3b82f6;
+            animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+            z-index: -1;
+        }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #374151; border-radius: 10px; }
+    </style>
+</head>
+<body class="bg-slate-950 text-gray-100 min-h-screen flex flex-col font-sans selection:bg-cyan-500 selection:text-white">
+
+    <!-- Header Futurista -->
+    <header class="border-b border-cyan-900/30 bg-slate-900/50 backdrop-blur-md sticky top-0 z-10">
+        <div class="max-w-4xl mx-auto p-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="relative flex items-center justify-center w-10 h-10 rounded-full bg-cyan-950 text-cyan-400 border border-cyan-800">
+                    <i class="ph-fill ph-waves text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">SonicBeam</h1>
+                    <p class="text-[10px] text-cyan-500 uppercase tracking-widest font-mono">Internet Acústica v1.0</p>
+                </div>
+            </div>
+            <div class="text-xs text-slate-400 font-mono hidden md:block">
+                PROTOCOLO: FDM (Freq-Division Multiplexing)
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-4xl mx-auto w-full p-4 md:p-6 grid grid-cols-1 md:grid-cols-2 gap-6 relative">
+        
+        <!-- Notificações em Tela (Substitui Alert) -->
+        <div id="toast-container" class="absolute top-4 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-2 w-full max-w-sm pointer-events-none"></div>
+
+        <!-- Módulo Transmissor -->
+        <div class="bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-2xl relative overflow-hidden group">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-cyan-500 to-blue-600"></div>
+            
+            <div class="flex items-center gap-3 mb-6">
+                <i class="ph-fill ph-broadcast text-3xl text-cyan-400"></i>
+                <h2 class="text-lg font-semibold text-white">Emitir Dados</h2>
+            </div>
+            
+            <p class="text-sm text-slate-400 mb-4 h-10">Transforme texto em "QR Codes Sonoros". O som emitido contém os dados codificados.</p>
+
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-mono text-cyan-500 mb-2 uppercase tracking-wide">Mensagem (A-Z, 0-9)</label>
+                    <textarea id="tx-input" rows="3" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-white font-mono focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 transition-all resize-none" placeholder="Digite uma mensagem secreta ou URL..."></textarea>
+                </div>
+
+                <div class="flex items-center justify-between bg-slate-950 p-3 rounded-xl border border-slate-800">
+                    <div class="text-xs font-mono text-slate-400">
+                        Baud Rate: <span class="text-cyan-400">5 char/sec</span><br>
+                        Espectro: <span class="text-cyan-400">1000Hz - 2500Hz</span>
+                    </div>
+                </div>
+
+                <button id="btn-transmit" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(8,145,178,0.4)] hover:shadow-[0_0_25px_rgba(8,145,178,0.6)]">
+                    <i class="ph-fill ph-speaker-hifi text-xl"></i> Iniciar Transmissão
+                </button>
+            </div>
+
+            <!-- Indicador visual de transmissão -->
+            <div id="tx-visualizer" class="hidden mt-6 flex justify-center items-center gap-1 h-8">
+                <!-- Barras animadas via JS -->
+            </div>
+        </div>
+
+        <!-- Módulo Receptor -->
+        <div class="bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-2xl relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-400 to-teal-500"></div>
+            
+            <div class="flex items-center gap-3 mb-6">
+                <div class="relative" id="rx-icon-container">
+                    <i class="ph-fill ph-ear text-3xl text-emerald-400 relative z-10"></i>
+                </div>
+                <div>
+                    <h2 class="text-lg font-semibold text-white">Receptor (Sonar)</h2>
+                </div>
+            </div>
+
+            <p class="text-sm text-slate-400 mb-4 h-10">Mantenha o microfone ligado para capturar as frequências no ar e extrair o texto em tempo real.</p>
+
+            <button id="btn-listen" class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(16,185,129,0.4)] mb-6">
+                <i class="ph-fill ph-microphone text-xl"></i> Ativar Escuta
+            </button>
+
+            <!-- Console de Recepção -->
+            <div class="bg-slate-950 border border-slate-700 rounded-xl p-4 h-40 flex flex-col relative font-mono">
+                <div class="flex justify-between items-center mb-2 border-b border-slate-800 pb-2">
+                    <span class="text-[10px] text-emerald-500 uppercase">Terminal de Escuta</span>
+                    <span id="rx-status" class="text-[10px] text-slate-500">Inativo</span>
+                </div>
+                
+                <div id="rx-output" class="flex-grow text-emerald-400 text-sm overflow-y-auto break-all whitespace-pre-wrap flex items-start content-start">
+                    <span class="text-slate-600">Aguardando sinal...</span>
+                </div>
+
+                <!-- Waterfall Spectrogram Simplificado -->
+                <canvas id="spectrogram" class="absolute bottom-0 left-0 w-full h-8 opacity-30 pointer-events-none rounded-b-xl"></canvas>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="text-center py-6 text-xs font-mono text-slate-500">
+        Conceito de Internet Acústica (Acoustic AirDrop) • Freq-Division Multiplexing
+    </footer>
+
+    <script>
+        // --- UTILIDADES ---
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const color = type === 'error' ? 'bg-red-500' : 'bg-blue-500';
+            toast.className = `${color} text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium transition-all duration-300 transform translate-y-0 opacity-100 flex items-center gap-2 pointer-events-auto`;
+            toast.innerHTML = `<i class="ph-fill ph-info"></i> ${message}`;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.classList.add('opacity-0', '-translate-y-4');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        // --- PROTOCOLO SONICBEAM (Configurações) ---
+        // Mapeamos 40 caracteres para frequências específicas
+        const CHARSET = " abcdefghijklmnopqrstuvwxyz0123456789.,!?";
+        const BASE_FREQ = 1000; // Hz
+        const FREQ_STEP = 40;   // Separação de 40Hz por caractere (Min: 1000, Max: 2560)
+        
+        const TONE_DURATION = 150; // ms de som contínuo
+        const TONE_GAP = 50;       // ms de silêncio entre as letras (para evitar fusão)
+        
+        const SYNC_FREQ = 3000;    // Frequência de "Atenção! Dados chegando!"
+        const END_FREQ = 800;      // Frequência de encerramento
+
+        // --- TRANSMISSOR (Emitir Dados) ---
+        const btnTransmit = document.getElementById('btn-transmit');
+        const txInput = document.getElementById('tx-input');
+        const txVisualizer = document.getElementById('tx-visualizer');
+        
+        let audioCtxTx = null;
+
+        btnTransmit.addEventListener('click', async () => {
+            const text = txInput.value.toLowerCase().replace(/[^a-z0-9 .,!?]/g, '');
+            if (!text) return showToast('Digite uma mensagem válida!', 'error');
+
+            if (!audioCtxTx) audioCtxTx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtxTx.state === 'suspended') await audioCtxTx.resume();
+
+            btnTransmit.disabled = true;
+            btnTransmit.innerHTML = '<i class="ph ph-spinner animate-spin text-xl"></i> Transmitindo...';
+            txVisualizer.innerHTML = '';
+            txVisualizer.classList.remove('hidden');
+
+            for(let i=0; i<10; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'w-1 bg-cyan-400 rounded-full animate-pulse';
+                bar.style.height = `${Math.random() * 100 + 20}%`;
+                bar.style.animationDuration = `${Math.random() * 0.5 + 0.1}s`;
+                txVisualizer.appendChild(bar);
+            }
+
+            const timeNow = audioCtxTx.currentTime;
+            let offset = 0;
+
+            // 1. Tocar Tom de Sincronia (Aviso inicial)
+            playTone(audioCtxTx, SYNC_FREQ, timeNow, 0.4);
+            offset += 0.4 + (TONE_GAP/1000);
+
+            // 2. Tocar os caracteres
+            for (let i = 0; i < text.length; i++) {
+                const char = text[i];
+                const index = CHARSET.indexOf(char);
+                if (index !== -1) {
+                    const freq = BASE_FREQ + (index * FREQ_STEP);
+                    playTone(audioCtxTx, freq, timeNow + offset, TONE_DURATION / 1000);
+                }
+                offset += (TONE_DURATION + TONE_GAP) / 1000;
+            }
+
+            // 3. Tom de Fim
+            playTone(audioCtxTx, END_FREQ, timeNow + offset, 0.3);
+            offset += 0.3;
+
+            // Resetar UI ao fim
+            setTimeout(() => {
+                btnTransmit.disabled = false;
+                btnTransmit.innerHTML = '<i class="ph-fill ph-speaker-hifi text-xl"></i> Iniciar Transmissão';
+                txVisualizer.classList.add('hidden');
+                showToast('Transmissão concluída com sucesso!');
+            }, offset * 1000);
+        });
+
+        function playTone(ctx, freq, startTime, duration) {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            
+            osc.type = 'sine'; // Senoide pura é melhor para FFT
+            osc.frequency.setValueAtTime(freq, startTime);
+            
+            // Envelope suave para evitar "cliques" no alto-falante
+            gain.gain.setValueAtTime(0, startTime);
+            gain.gain.linearRampToValueAtTime(1, startTime + 0.02);
+            gain.gain.setValueAtTime(1, startTime + duration - 0.02);
+            gain.gain.linearRampToValueAtTime(0, startTime + duration);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            
+            osc.start(startTime);
+            osc.stop(startTime + duration);
+        }
+
+        // --- RECEPTOR (Escutar Dados) ---
+        const btnListen = document.getElementById('btn-listen');
+        const rxIconContainer = document.getElementById('rx-icon-container');
+        const rxStatus = document.getElementById('rx-status');
+        const rxOutput = document.getElementById('rx-output');
+        const spectrogram = document.getElementById('spectrogram');
+        const specCtx = spectrogram.getContext('2d');
+
+        let audioCtxRx = null;
+        let analyser = null;
+        let isListening = false;
+        let rxInterval = null;
+        let lastChar = null;
+        let lastCharTime = 0;
+
+        btnListen.addEventListener('click', async () => {
+            if (isListening) {
+                stopListening();
+                return;
+            }
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false } });
+                
+                audioCtxRx = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioCtxRx.createMediaStreamSource(stream);
+                
+                analyser = audioCtxRx.createAnalyser();
+                analyser.fftSize = 4096; // Alta resolução de frequência (necessário para passos de 40Hz)
+                analyser.smoothingTimeConstant = 0.2; // Rápida resposta
+                
+                source.connect(analyser);
+                
+                isListening = true;
+                btnListen.innerHTML = '<i class="ph-fill ph-stop text-xl"></i> Parar Escuta';
+                btnListen.classList.replace('bg-emerald-600', 'bg-red-600');
+                btnListen.classList.replace('hover:bg-emerald-500', 'hover:bg-red-500');
+                rxIconContainer.classList.add('radar-pulse');
+                rxStatus.textContent = 'Ouvindo frequências...';
+                rxStatus.classList.replace('text-slate-500', 'text-emerald-500');
+                rxStatus.classList.add('animate-pulse');
+                
+                rxOutput.innerHTML = ''; // Limpar output anterior
+
+                analyzeAudio();
+
+            } catch (err) {
+                showToast('Permissão de microfone negada ou erro ao iniciar.', 'error');
+                console.error(err);
+            }
+        });
+
+        function stopListening() {
+            isListening = false;
+            cancelAnimationFrame(rxInterval);
+            if (audioCtxRx) {
+                audioCtxRx.close();
+                audioCtxRx = null;
+            }
+            btnListen.innerHTML = '<i class="ph-fill ph-microphone text-xl"></i> Ativar Escuta';
+            btnListen.classList.replace('bg-red-600', 'bg-emerald-600');
+            btnListen.classList.replace('hover:bg-red-500', 'hover:bg-emerald-500');
+            rxIconContainer.classList.remove('radar-pulse');
+            rxStatus.textContent = 'Inativo';
+            rxStatus.classList.replace('text-emerald-500', 'text-slate-500');
+            rxStatus.classList.remove('animate-pulse');
+            
+            // Limpar spectrograma
+            specCtx.clearRect(0, 0, spectrogram.width, spectrogram.height);
+        }
+
+        function analyzeAudio() {
+            if (!isListening) return;
+
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+            analyser.getByteFrequencyData(dataArray);
+
+            const sampleRate = audioCtxRx.sampleRate;
+            const hzPerBin = (sampleRate / 2) / bufferLength;
+
+            // Visualização do Spectrograma (Efeito visual)
+            drawSpectrogram(dataArray);
+
+            // --- Lógica do Decodificador FDM ---
+            let maxEnergy = 0;
+            let peakBin = 0;
+
+            // Procurar a frequência com maior energia na nossa banda de interesse (800Hz a 3200Hz)
+            const minBin = Math.floor(800 / hzPerBin);
+            const maxBin = Math.ceil(3200 / hzPerBin);
+
+            for (let i = minBin; i <= maxBin; i++) {
+                if (dataArray[i] > maxEnergy) {
+                    maxEnergy = dataArray[i];
+                    peakBin = i;
+                }
+            }
+
+            const peakFreq = peakBin * hzPerBin;
+            const now = performance.now();
+
+            // Threshold dinâmico de volume (precisa ser alto o suficiente para não captar ruído de fundo)
+            if (maxEnergy > 160) {
+                
+                // Detectou Sincronia
+                if (Math.abs(peakFreq - SYNC_FREQ) < 50) {
+                    // Prepara para receber
+                    lastChar = null;
+                    rxIconContainer.classList.add('text-white'); // Pisca branco
+                    setTimeout(()=> rxIconContainer.classList.remove('text-white'), 200);
+                } 
+                // Detectou fim
+                else if (Math.abs(peakFreq - END_FREQ) < 50) {
+                    // Finalizado
+                } 
+                // Detectou Caractere (Dados)
+                else {
+                    // Reverter a matemática: freq = BASE_FREQ + (index * FREQ_STEP)
+                    // index = (freq - BASE_FREQ) / FREQ_STEP
+                    let estimatedIndex = Math.round((peakFreq - BASE_FREQ) / FREQ_STEP);
+                    
+                    if (estimatedIndex >= 0 && estimatedIndex < CHARSET.length) {
+                        const detectedChar = CHARSET[estimatedIndex];
+                        
+                        // Lógica para evitar caracteres duplicados devido à leitura muito rápida do requestAnimationFrame
+                        // Só registra um novo caractere se passar o tempo mínimo (TONE_DURATION) ou se for um caractere diferente
+                        if (detectedChar !== lastChar || (now - lastCharTime) > (TONE_DURATION + TONE_GAP * 0.8)) {
+                            
+                            // Adicionar ao console de output
+                            rxOutput.innerHTML += `<span class="opacity-0 animate-[fadeIn_0.2s_forwards]">${detectedChar}</span>`;
+                            
+                            // Scrollar automaticamente para o fundo
+                            rxOutput.parentElement.scrollTop = rxOutput.parentElement.scrollHeight;
+
+                            lastChar = detectedChar;
+                            lastCharTime = now;
+                        }
+                    }
+                }
+            } else {
+                // Silêncio detectado (reseta o último caractere lido se o silêncio demorar)
+                if (now - lastCharTime > TONE_GAP) {
+                     lastChar = null; 
+                }
+            }
+
+            rxInterval = requestAnimationFrame(analyzeAudio);
+        }
+
+        function drawSpectrogram(dataArray) {
+            spectrogram.width = spectrogram.clientWidth;
+            spectrogram.height = spectrogram.clientHeight;
+            
+            const width = spectrogram.width;
+            const height = spectrogram.height;
+            const step = Math.ceil(dataArray.length / width);
+
+            specCtx.clearRect(0, 0, width, height);
+            specCtx.fillStyle = '#10b981'; // Emerald 500
+
+            for (let i = 0; i < width; i++) {
+                let sum = 0;
+                for (let j = 0; j < step; j++) {
+                    sum += dataArray[(i * step) + j] || 0;
+                }
+                const avg = sum / step;
+                const barHeight = (avg / 255) * height;
+                
+                specCtx.fillRect(i, height - barHeight, 1, barHeight);
+            }
+        }
+    </script>
+    <style>
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(2px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</body>
+</html>
+
+
+```
